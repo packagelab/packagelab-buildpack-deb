@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# fail fast
+set -o errexit
+set -o nounset
+set -o pipefail
+
+indent() {
+  sed -u 's/^/       /'
+}
+
+scriptname=$(basename $0)
+case $# in
+  2) :;;
+  *) echo "$scriptname: usage: $scriptname BUILD_DIR CACHE_DIR" >&2; exit 2;;
+esac
+
+build_dir="$1"
+cache_dir="$2"
+ccache_max_size=50G
+num_cpu=$(grep -c ^bogomips /proc/cpuinfo)
+
+export CCACHE_DIR=$cache_dir/ccache
+export PATH=/usr/lib/ccache:$PATH
+export MAVEN_OPTS=-Dmaven.repo.local=$cache_dir/m2/repository
+
+if test -x $build_dir/debian/rules
+then
+  # dpkg-buildpackage wants to generate the .deb files in ..
+  # so we have to copy the repo one level inside into .build
+  sub_dir=$build_dir/.app
+  echo "-----> Copying sources into .build"
+  mkdir -p $sub_dir
+  tar -C $build_dir -cf $cache_dir/app.tar .
+  tar -C $sub_dir -xf $cache_dir/app.tar
+  rm -f $cache_dir/app.tar
+else
+  echo "-----> Unpacking sources"
+  cd $build_dir >/dev/null 2>&1
+  dpkg-source -x *.dsc 2>&1 | indent
+  cd - >/dev/null 2>&1
+  sub_dir=$(dirname $(dirname $(ls $build_dir/*/debian/rules | head -n1)))
+fi
+
+echo "-----> Zeroing ccache stats"
+ccache -M $ccache_max_size 2>&1 | indent
+ccache -z 2>&1 | indent
+
+echo "-----> Building package"
+cd $sub_dir >/dev/null 2>&1
+dpkg-buildpackage -j$num_cpu -rfakeroot -b 2>&1 | indent
+cd - >/dev/null 2>&1

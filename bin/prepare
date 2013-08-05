@@ -1,0 +1,64 @@
+#!/bin/bash
+
+# fail fast
+set -o errexit
+set -o nounset
+set -o pipefail
+
+scriptname=$(basename $0)
+case $# in
+  1) :;;
+  *) echo "$scriptname: usage: $scriptname BUILD_DIR" >&2; exit 2;;
+esac
+
+build_dir="$1"
+
+echo "-----> Running prepare" >&2
+
+echo ccache
+echo debhelper
+(
+  if ls $build_dir/*.dsc >/dev/null 2>&1
+  then
+    cat $build_dir/*.dsc
+  elif test -e $build_dir/debian/control
+  then
+    cat $build_dir/debian/control
+  fi
+) | python -c '
+import os
+import subprocess
+import sys
+
+null = open("/dev/null")
+cont = False
+for line in sys.stdin.readlines():
+    line = line.rstrip()
+
+    if line.startswith("Build-Depends:"):
+        line = line[14:]
+    elif line.startswith("Build-Depends-Indep:"):
+        line = line[20:]
+    elif line.startswith(" ") and cont:
+        pass
+    else:
+        cont = False
+        continue
+
+    for token in line.split(","):
+        if not token:
+            continue
+        if "|" not in token:
+            print token.strip().split(" ", 1)[0]
+            continue
+
+        for sub in token.split("|"):
+            sub = sub.strip().split(" ", 1)[0]
+            result = subprocess.call(["apt-cache", "show", sub],
+                                     stdout=null, stderr=null)
+            if result == 0:
+                print sub.strip()
+                break
+    cont = True
+' \
+| sort -u
