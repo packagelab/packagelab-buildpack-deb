@@ -24,7 +24,7 @@ export CCACHE_DIR=$cache_dir/ccache
 export PATH=/usr/lib/ccache:$PATH
 export MAVEN_OPTS=-Dmaven.repo.local=$cache_dir/m2/repository
 
-if test -x $build_dir/debian/rules
+if test -f $build_dir/debian/rules
 then
   # dpkg-buildpackage wants to generate the .deb files in ..
   # so we have to copy the repo one level inside into .build
