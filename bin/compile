@@ -23,6 +23,7 @@ num_cpu=$(grep -c ^bogomips /proc/cpuinfo)
 export CCACHE_DIR=$cache_dir/ccache
 export PATH=/usr/lib/ccache:$PATH
 export MAVEN_OPTS=-Dmaven.repo.local=$cache_dir/m2/repository
+export DEB_BUILD_OPTIONS="ccache parallel=$num_cpu"
 
 if test -f $build_dir/debian/rules
 then
