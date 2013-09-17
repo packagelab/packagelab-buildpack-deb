@@ -27,6 +27,35 @@ export DEB_BUILD_OPTIONS="ccache parallel=$num_cpu"
 
 if test -f $build_dir/debian/rules
 then
+  # Update debian/changelog if necessary to include development release
+  cd $build_dir >/dev/null 2>&1
+  timestamp=$(date +%Y%m%d%H%M%S)
+  changelog_version=$(dpkg-parsechangelog | sed -ne 's,Version: ,,p' | sed 's/-.*$//')
+  deb_email='builder@cherrybuild.com'
+  deb_full_name='Cherrybuild'
+  if test -d $build_dir/.git
+  then
+    commit=$(git log -n 1 --oneline | awk '{print $1}')
+    tag_version=$(git show-ref --tags -d | awk '$1 ~ /^'"$commit"'/ {print $2}' | sed -e 's#refs/tags/##' -e 's/\^{}//' | sort | head -n1)
+    case "$tag_version" in
+      *$changelog_version)
+        echo "-----> Using version $changelog_version from tag $tag_version"
+        ;;
+      *)
+        extra=dev.g$commit
+        deb_version=$changelog_version+$timestamp.$extra-1
+        echo "-----> Adding version $deb_version to changelog"
+        env DEBEMAIL=$deb_email DEBFULLNAME=$deb_full_name debchange -v $deb_version Development snapshot $deb_version
+        ;;
+    esac
+  else
+    extra=dev
+    deb_version=$changelog_version+$timestamp.$extra-1
+    echo "-----> Adding version $deb_version to changelog"
+    env DEBEMAIL=$deb_email DEBFULLNAME=$deb_full_name debchange -v $deb_version Development snapshot $deb_version
+  fi
+  cd - >/dev/null 2>&1
+
   # dpkg-buildpackage wants to generate the .deb files in ..
   # so we have to copy the repo one level inside into .build
   sub_dir=$build_dir/.app
