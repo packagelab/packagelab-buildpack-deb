@@ -17,6 +17,7 @@ echo "-----> Running prepare" >&2
 
 echo ccache
 echo debhelper
+echo devscripts
 (
   if ls $build_dir/*.dsc >/dev/null 2>&1
   then
