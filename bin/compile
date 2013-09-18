@@ -69,7 +69,7 @@ then
         deb_full_name='Cherrybuild'
         deb_version=$changelog_version${deb_separator}$deb_timestamp.$deb_extra-1
         echo "       Adding entry $deb_version to debian/changelog"
-        env DEBEMAIL=$deb_email DEBFULLNAME=$deb_full_name debchange $deb_flags -v $deb_version Development snapshot $deb_version
+        env DEBEMAIL=$deb_email DEBFULLNAME=$deb_full_name debchange $deb_flags -v $deb_version Development snapshot $deb_version 2>&1 | indent
         ;;
     esac
   fi
