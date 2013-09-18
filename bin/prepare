@@ -13,8 +13,6 @@ esac
 
 build_dir="$1"
 
-echo "-----> Running prepare" >&2
-
 echo ccache
 echo debhelper
 echo devscripts
@@ -62,4 +60,4 @@ for line in sys.stdin.readlines():
                 break
     cont = True
 ' \
-| sort -u
+| sort -u | uniq
