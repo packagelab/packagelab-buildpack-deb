@@ -27,32 +27,51 @@ export DEB_BUILD_OPTIONS="ccache parallel=$num_cpu"
 
 if test -f $build_dir/debian/rules
 then
-  # Update debian/changelog if necessary to include development release
+  # Update debian/changelog if necessary to include development version
   cd $build_dir >/dev/null 2>&1
-  timestamp=$(date +%Y%m%d%H%M%S)
-  changelog_version=$(dpkg-parsechangelog | sed -ne 's,Version: ,,p' | sed 's/-.*$//')
-  deb_email='builder@cherrybuild.com'
-  deb_full_name='Cherrybuild'
   if test -d $build_dir/.git
   then
-    commit=$(git log -n 1 --oneline | awk '{print $1}')
-    tag_version=$(git show-ref --tags -d | awk '$1 ~ /^'"$commit"'/ {print $2}' | sed -e 's#refs/tags/##' -e 's/\^{}//' | sort | head -n1)
-    case "$tag_version" in
-      *$changelog_version)
-        echo "-----> Using version $changelog_version from tag $tag_version"
+    changelog_version=$(dpkg-parsechangelog | sed -ne 's,Version: ,,p' | sed 's/-.*$//')
+    tagged_commit=$(git show-ref --tags -d | awk '$2 ~ /^(.*[^0-9]+)?'"$changelog_version"'\^{}$/ {print $1}' | head -n1)
+    commit=$(git log -n 1 | awk '$1 == "commit" {print $2}')
+    case "$tagged_commit" in
+      "$commit")
+        echo "-----> Assuming commit is release $changelog_version"
+        ;;
+      '')
+        case "$changelog_version" in
+          *[a-z]*)
+            echo "-----> Assuming commit is post-release $changelog_version"
+            deb_separator='+'
+            deb_flags=
+            ;;
+          *)
+            echo "-----> Assuming commit is pre-release $changelog_version"
+            deb_separator='~'
+            deb_flags='-b'
+            ;;
+          esac
         ;;
       *)
-        extra=dev.g$commit
-        deb_version=$changelog_version+$timestamp.$extra-1
-        echo "-----> Adding version $deb_version to changelog"
-        env DEBEMAIL=$deb_email DEBFULLNAME=$deb_full_name debchange -v $deb_version Development snapshot $deb_version
+        echo "-----> Assuming commit is post-release $changelog_version"
+        deb_separator='+'
+        deb_flags=
         ;;
     esac
-  else
-    extra=dev
-    deb_version=$changelog_version+$timestamp.$extra-1
-    echo "-----> Adding version $deb_version to changelog"
-    env DEBEMAIL=$deb_email DEBFULLNAME=$deb_full_name debchange -v $deb_version Development snapshot $deb_version
+    case "$tagged_commit" in
+      "$commit")
+        echo "       Not modifying debian/changelog"
+        ;;
+      *)
+        deb_timestamp=$(date +%Y%m%d%H%M%S)
+        deb_extra=dev.g$(echo $commit | sed 's/^\(.\{7\}\).*/\1/')
+        deb_email='builder@cherrybuild.com'
+        deb_full_name='Cherrybuild'
+        deb_version=$changelog_version${deb_separator}$deb_timestamp.$deb_extra-1
+        echo "       Adding entry $deb_version to debian/changelog"
+        env DEBEMAIL=$deb_email DEBFULLNAME=$deb_full_name debchange $deb_flags -v $deb_version Development snapshot $deb_version
+        ;;
+    esac
   fi
   cd - >/dev/null 2>&1
 
