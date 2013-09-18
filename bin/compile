@@ -32,7 +32,8 @@ then
   if test -d $build_dir/.git
   then
     changelog_version=$(dpkg-parsechangelog | sed -ne 's,Version: ,,p' | sed 's/-.*$//')
-    tagged_commit=$(git show-ref --tags -d | awk '$2 ~ /^(.*[^0-9]+)?'"$changelog_version"'\^{}$/ {print $1}' | head -n1)
+    tag=$(git tag | egrep '^(\w*[^0-9])?'"$changelog_version"'$' | head -n 1)
+    tagged_commit=$(git rev-list -n 1 "$tag")
     commit=$(git log -n 1 | awk '$1 == "commit" {print $2}')
     case "$tagged_commit" in
       "$commit")
