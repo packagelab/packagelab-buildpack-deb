@@ -47,6 +47,9 @@ for line in sys.stdin.readlines():
     for token in line.split(","):
         if not token:
             continue
+        # Hack for bad spacing. Example: "python(>= 2.6.6-3~)"
+        if "(" in token:
+            token = token.split("(", 1)[0]
         if "|" not in token:
             print token.strip().split(" ", 1)[0]
             continue
