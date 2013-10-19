@@ -38,7 +38,7 @@ for line in sys.stdin.readlines():
         line = line[14:]
     elif line.startswith("Build-Depends-Indep:"):
         line = line[20:]
-    elif line.startswith(" ") and cont:
+    elif line[:1] in [" ", "\t"] and cont:
         pass
     else:
         cont = False
