@@ -16,6 +16,7 @@ build_dir="$1"
 echo ccache
 echo debhelper
 echo devscripts
+echo python-support
 (
   if ls $build_dir/*.dsc >/dev/null 2>&1
   then
