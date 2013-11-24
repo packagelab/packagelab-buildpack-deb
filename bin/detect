@@ -21,6 +21,11 @@ elif test -f $build_dir/debian/rules
 then
   echo Debian/Ubuntu
   exit 0
+elif test -f $build_dir/packaging/debian/rules
+then
+  ln -s packaging/debian $build_dir/debian
+  echo Debian/Ubuntu
+  exit 0
 else
   exit 1
 fi
