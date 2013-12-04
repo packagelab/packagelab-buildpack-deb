@@ -20,10 +20,15 @@ cache_dir="$2"
 ccache_max_size=50G
 num_cpu=$(grep -c ^bogomips /proc/cpuinfo)
 
-export CCACHE_DIR=$cache_dir/ccache
-export PATH=/usr/lib/ccache:$PATH
 export MAVEN_OPTS=-Dmaven.repo.local=$cache_dir/m2/repository
-export DEB_BUILD_OPTIONS="ccache parallel=$num_cpu"
+if test -d $build_dir/pyne
+then
+  export DEB_BUILD_OPTIONS="parallel=$num_cpu"
+else
+  export CCACHE_DIR=$cache_dir/ccache
+  export DEB_BUILD_OPTIONS="ccache parallel=$num_cpu"
+  export PATH=/usr/lib/ccache:$PATH
+fi
 
 echo "-----> Parsing debian/changelog"
 if test -f $build_dir/debian/rules
@@ -96,9 +101,12 @@ else
   sub_dir=$(dirname $(dirname $(ls $build_dir/*/debian/rules | head -n1)))
 fi
 
-echo "-----> Zeroing ccache stats"
-ccache -M $ccache_max_size 2>&1 | indent
-ccache -z 2>&1 | indent
+if test ! -d $build_dir/pyne
+then
+  echo "-----> Zeroing ccache stats"
+  ccache -M $ccache_max_size 2>&1 | indent
+  ccache -z 2>&1 | indent
+fi
 
 echo "-----> Building package"
 cd $sub_dir >/dev/null 2>&1
