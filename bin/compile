@@ -75,8 +75,8 @@ then
       *)
         deb_timestamp=$(date +%Y%m%d%H%M%S)
         deb_extra=dev.g$(echo $commit | sed 's/^\(.\{7\}\).*/\1/')
-        deb_email='builder@cherrybuild.com'
-        deb_full_name='Cherrybuild'
+        deb_email='builder@packagelab.com'
+        deb_full_name='Package Lab'
         deb_version=$changelog_version${deb_separator}$deb_timestamp.$deb_extra-1
         echo "       Adding entry to debian/changelog: $deb_version"
         env DEBEMAIL=$deb_email DEBFULLNAME=$deb_full_name debchange $deb_flags -v $deb_version Development snapshot $deb_version 2>&1 | indent
