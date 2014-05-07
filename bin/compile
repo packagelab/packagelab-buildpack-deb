@@ -73,8 +73,9 @@ then
         echo "       Not modifying debian/changelog"
         ;;
       *)
+        # Example: 3.0.1+201405074137.git.cf89c98
         deb_timestamp=$(date +%Y%m%d%H%M%S)
-        deb_extra=dev.g$(echo $commit | sed 's/^\(.\{7\}\).*/\1/')
+        deb_extra=git.$(echo $commit | sed 's/^\(.\{7\}\).*/\1/')
         deb_email='builder@packagelab.com'
         deb_full_name='Package Lab'
         deb_version=$changelog_version${deb_separator}$deb_timestamp.$deb_extra-1
