@@ -26,6 +26,11 @@ then
   ln -s packaging/debian $build_dir/debian
   echo Debian/Ubuntu
   exit 0
+elif test -f $build_dir/ext/debian/rules
+then
+  ln -s ext/debian $build_dir/debian
+  echo Debian/Ubuntu
+  exit 0
 else
   exit 1
 fi
