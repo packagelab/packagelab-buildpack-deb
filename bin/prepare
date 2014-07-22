@@ -12,6 +12,11 @@ case $# in
 esac
 
 build_dir="$1"
+vendor_apt_url=http://s3.amazonaws.com/cb-misc/lucid-amd64/vendor-apt-1.0.5.tar.gz
+python=$build_dir/.heroku/python/bin/python
+
+mkdir -p "$build_dir"/.heroku
+curl -fsSL $vendor_apt_url | tar -C "$build_dir"/.heroku -xzf -
 
 cat <<EOT
 ---
@@ -23,50 +28,37 @@ packages:
   - fakeroot
   - python-support
 EOT
-(
-  if ls $build_dir/*.dsc >/dev/null 2>&1
-  then
-    cat $build_dir/*.dsc
-  elif test -e $build_dir/debian/control
-  then
-    cat $build_dir/debian/control
-  fi
-) | sed '/^#/d' | python -c '
-import os
-import subprocess
+
+cat <<EOT >/tmp/get_deps.py
+from cStringIO import StringIO
 import sys
 
-null = open("/dev/null")
-cont = False
-for line in sys.stdin.readlines():
-    line = line.rstrip()
+from apt.cache import Cache
+from apt.debfile import DscSrcPackage
 
-    if line.startswith("Build-Depends:"):
-        line = line[14:]
-    elif line.startswith("Build-Depends-Indep:"):
-        line = line[20:]
-    elif line[:1] in [" ", "\t"] and cont:
-        pass
-    else:
-        cont = False
-        continue
+deb = DscSrcPackage(sys.argv[1], Cache())
+deb.check()
+for p in deb.required_changes[0]:
+    print p
+EOT
 
-    for token in line.split(","):
-        if not token:
-            continue
-        # Hack for bad spacing. Example: "python(>= 2.6.6-3~)"
-        if "(" in token:
-            token = token.split("(", 1)[0]
-        if "|" not in token:
-            print token.strip().split(" ", 1)[0]
-            continue
+echo 'APT::Install-Recommends "false";' >/tmp/apt.conf
 
-        for sub in token.split("|"):
-            sub = sub.strip().split(" ", 1)[0]
-            result = subprocess.call(["apt-cache", "show", sub],
-                                     stdout=null, stderr=null)
-            if result == 0:
-                print sub.strip()
-                break
-    cont = True
-' | sort -u | uniq | sed 's/^/  - /'
+dsc=
+if ls $build_dir/*.dsc >/dev/null 2>&1
+then
+  dsc=$build_dir/*.dsc
+elif test -e $build_dir/debian/control
+then
+  dsc=$build_dir/debian/control
+fi
+
+export APT_CONFIG=/tmp/apt.conf
+export LD_LIBRARY_PATH=$build_dir/.heroku/python/lib:$build_dir/.heroku/vendor/lib
+
+"$build_dir"/.heroku/python/bin/python /tmp/get_deps.py "$dsc" \
+| sort -u \
+| uniq \
+| sed 's/^/  - /'
+
+rm -rf "$build_dir"/.heroku
