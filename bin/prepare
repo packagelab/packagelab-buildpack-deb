@@ -12,61 +12,27 @@ case $# in
 esac
 
 build_dir="$1"
+apt_resolve_dep=$(dirname $0)/../vendor/apt-resolve-dep-0.1.0-amd64/bin/apt-resolve-dep
 
 cat <<EOT
 ---
 packages:
-  - build-essential
   - ccache
   - debhelper
   - devscripts
   - fakeroot
   - python-support
 EOT
-(
-  if ls $build_dir/*.dsc >/dev/null 2>&1
-  then
-    cat $build_dir/*.dsc
-  elif test -e $build_dir/debian/control
-  then
-    cat $build_dir/debian/control
-  fi
-) | sed '/^#/d' | python -c '
-import os
-import subprocess
-import sys
 
-null = open("/dev/null")
-cont = False
-for line in sys.stdin.readlines():
-    line = line.rstrip()
+dsc=
+if ls $build_dir/*.dsc >/dev/null 2>&1
+then
+  dsc=$build_dir/*.dsc
+elif test -e $build_dir/debian/control
+then
+  dsc=$build_dir/debian/control
+fi
 
-    if line.startswith("Build-Depends:"):
-        line = line[14:]
-    elif line.startswith("Build-Depends-Indep:"):
-        line = line[20:]
-    elif line[:1] in [" ", "\t"] and cont:
-        pass
-    else:
-        cont = False
-        continue
-
-    for token in line.split(","):
-        if not token:
-            continue
-        # Hack for bad spacing. Example: "python(>= 2.6.6-3~)"
-        if "(" in token:
-            token = token.split("(", 1)[0]
-        if "|" not in token:
-            print token.strip().split(" ", 1)[0]
-            continue
-
-        for sub in token.split("|"):
-            sub = sub.strip().split(" ", 1)[0]
-            result = subprocess.call(["apt-cache", "show", sub],
-                                     stdout=null, stderr=null)
-            if result == 0:
-                print sub.strip()
-                break
-    cont = True
-' | sort -u | uniq | sed 's/^/  - /'
+# XXX: Remove comments from DSC file or else apt-resolve-dep might choke
+sed -i -e '/^#/d' $dsc
+$apt_resolve_dep $dsc | sed -e 's/=.*$//' -e 's/^/  - /'
