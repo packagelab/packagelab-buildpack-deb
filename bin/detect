@@ -12,24 +12,25 @@ case $# in
 esac
 
 build_dir="$1"
+app_type='Debian package'
 
 if ls $build_dir/*.dsc >/dev/null 2>&1
 then
-  echo Debian/Ubuntu
+  echo $app_type
   exit 0
 elif test -f $build_dir/debian/rules
 then
-  echo Debian/Ubuntu
+  echo $app_type
   exit 0
 elif test -f $build_dir/packaging/debian/rules
 then
   ln -s packaging/debian $build_dir/debian
-  echo Debian/Ubuntu
+  echo $app_type
   exit 0
 elif test -f $build_dir/ext/debian/rules
 then
   ln -s ext/debian $build_dir/debian
-  echo Debian/Ubuntu
+  echo $app_type
   exit 0
 else
   exit 1
