@@ -39,7 +39,7 @@ then
   then
     changelog_version=$(dpkg-parsechangelog | sed -ne 's,Version: ,,p' | sed 's/-.*$//')
     echo "       Found changelog version: $changelog_version"
-    tag=$(git tag | egrep '^(\w*[^0-9])?'"$changelog_version"'$' || : | head -n 1)
+    tag=$(git tag | (egrep '^(\w*[^0-9])?'"$changelog_version"'$' || :) | head -n 1)
     echo "       Found tag: $tag"
     case "$tag" in
       '') tagged_commit=;;
