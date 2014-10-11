@@ -37,9 +37,19 @@ then
   cd $build_dir >/dev/null 2>&1
   if test -d $build_dir/.git
   then
-    changelog_version=$(dpkg-parsechangelog | sed -ne 's,Version: ,,p' | sed 's/-.*$//')
+    changelog_version=$(dpkg-parsechangelog | sed -ne 's,Version: ,,p')
     echo "       Found changelog version: $changelog_version"
+    # Strip off epoch
+    changelog_version=$(echo $changelog_version | sed 's/^[0-9]*://')
+    # Try to find a tag with release present
     tag=$(git tag | (egrep '^(\w*[^0-9])?'"$changelog_version"'$' || :) | head -n 1)
+    case "$tag" in
+      '')
+        # Try to find a tag with release stripped off
+        changelog_version=$(echo $changelog_version | sed 's/-.*$//')
+	tag=$(git tag | (egrep '^(\w*[^0-9])?'"$changelog_version"'$' || :) | head -n 1)
+        ;;
+    esac
     echo "       Found tag: $tag"
     case "$tag" in
       '') tagged_commit=;;
