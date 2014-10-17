@@ -9,6 +9,69 @@ indent() {
   sed -u 's/^/       /'
 }
 
+update_changelog() {
+  echo "-----> Parsing debian/changelog"
+  # Update debian/changelog if necessary to include development version
+  changelog_version=$(dpkg-parsechangelog | sed -ne 's,Version: ,,p')
+  echo "       Found changelog version: $changelog_version"
+  # Strip off epoch
+  changelog_version=$(echo $changelog_version | sed 's/^[0-9]*://')
+  # Try to find a tag with release present
+  tag=$(git tag | (egrep '^(\w*[^0-9])?'"$changelog_version"'$' || :) | head -n 1)
+  case "$tag" in
+    '')
+      # Try to find a tag with release stripped off
+      changelog_version=$(echo $changelog_version | sed 's/-.*$//')
+      tag=$(git tag | (egrep '^(\w*[^0-9])?'"$changelog_version"'$' || :) | head -n 1)
+      ;;
+  esac
+  echo "       Found tag: $tag"
+  case "$tag" in
+    '') tagged_commit=;;
+    *) tagged_commit=$(git rev-list -n 1 "$tag");;
+  esac
+  commit=$(git log -n 1 | awk '$1 == "commit" {print $2}')
+  case "$tagged_commit" in
+    "$commit")
+      echo "       Found style: release"
+      ;;
+    '')
+      case "$changelog_version" in
+        *[a-z]*)
+          echo "       Found style: post-release"
+          deb_separator='+'
+          deb_flags=
+          ;;
+        *)
+          echo "       Found style: pre-release"
+          deb_separator='~'
+          deb_flags='-b'
+          ;;
+        esac
+      ;;
+    *)
+      echo "       Found style: post-release"
+      deb_separator='+'
+      deb_flags=
+      ;;
+  esac
+  case "$tagged_commit" in
+    "$commit")
+      echo "       Not modifying debian/changelog"
+      ;;
+    *)
+      # Example: 3.0.1+201405074137.git.cf89c98
+      deb_timestamp=$(date +%Y%m%d%H%M%S)
+      deb_extra=git.$(echo $commit | sed 's/^\(.\{7\}\).*/\1/')
+      deb_email='builder@packagelab.com'
+      deb_full_name='Package Lab'
+      deb_version=$changelog_version${deb_separator}$deb_timestamp.$deb_extra-1
+      echo "       Adding entry to debian/changelog: $deb_version"
+      env DEBEMAIL="$deb_email" DEBFULLNAME="$deb_full_name" debchange $deb_flags -v $deb_version Development snapshot $deb_version 2>&1 | indent
+      ;;
+  esac
+}
+
 scriptname=$(basename $0)
 case $# in
   2) :;;
@@ -30,73 +93,24 @@ else
   export PATH=/usr/lib/ccache:$PATH
 fi
 
-echo "-----> Parsing debian/changelog"
 if test -f $build_dir/debian/rules
 then
-  # Update debian/changelog if necessary to include development version
-  cd $build_dir >/dev/null 2>&1
-  if test -d $build_dir/.git
+  file_count=$(ls $build_dir | wc -l)
+  if test "$file_count" -lt 3
   then
-    changelog_version=$(dpkg-parsechangelog | sed -ne 's,Version: ,,p')
-    echo "       Found changelog version: $changelog_version"
-    # Strip off epoch
-    changelog_version=$(echo $changelog_version | sed 's/^[0-9]*://')
-    # Try to find a tag with release present
-    tag=$(git tag | (egrep '^(\w*[^0-9])?'"$changelog_version"'$' || :) | head -n 1)
-    case "$tag" in
-      '')
-        # Try to find a tag with release stripped off
-        changelog_version=$(echo $changelog_version | sed 's/-.*$//')
-        tag=$(git tag | (egrep '^(\w*[^0-9])?'"$changelog_version"'$' || :) | head -n 1)
-        ;;
-    esac
-    echo "       Found tag: $tag"
-    case "$tag" in
-      '') tagged_commit=;;
-      *) tagged_commit=$(git rev-list -n 1 "$tag");;
-    esac
-    commit=$(git log -n 1 | awk '$1 == "commit" {print $2}')
-    case "$tagged_commit" in
-      "$commit")
-        echo "       Found style: release"
-        ;;
-      '')
-        case "$changelog_version" in
-          *[a-z]*)
-            echo "       Found style: post-release"
-            deb_separator='+'
-            deb_flags=
-            ;;
-          *)
-            echo "       Found style: pre-release"
-            deb_separator='~'
-            deb_flags='-b'
-            ;;
-          esac
-        ;;
-      *)
-        echo "       Found style: post-release"
-        deb_separator='+'
-        deb_flags=
-        ;;
-    esac
-    case "$tagged_commit" in
-      "$commit")
-        echo "       Not modifying debian/changelog"
-        ;;
-      *)
-        # Example: 3.0.1+201405074137.git.cf89c98
-        deb_timestamp=$(date +%Y%m%d%H%M%S)
-        deb_extra=git.$(echo $commit | sed 's/^\(.\{7\}\).*/\1/')
-        deb_email='builder@packagelab.com'
-        deb_full_name='Package Lab'
-        deb_version=$changelog_version${deb_separator}$deb_timestamp.$deb_extra-1
-        echo "       Adding entry to debian/changelog: $deb_version"
-        env DEBEMAIL="$deb_email" DEBFULLNAME="$deb_full_name" debchange $deb_flags -v $deb_version Development snapshot $deb_version 2>&1 | indent
-        ;;
-    esac
+    echo "-----> Downloading upstream source"
+    cd $build_dir >/dev/null 2>&1
+    mkdir -p $build_dir/.tmp
+    uscan --rename --download-current-version --destdir $build_dir/.tmp 2>&1 | indent
+    tar -C $build_dir --strip-components=1 -xf $build_dir/.tmp/*.orig.tar.*
+    rm -rf $build_dir/.tmp
+    cd - >/dev/null 2>&1
+  elif test -d $build_dir/.git
+  then
+    cd $build_dir >/dev/null 2>&1
+    update_changelog
+    cd - >/dev/null 2>&1
   fi
-  cd - >/dev/null 2>&1
 
   # dpkg-buildpackage wants to generate the .deb files in ..
   # so we have to copy the repo one level inside into .build
